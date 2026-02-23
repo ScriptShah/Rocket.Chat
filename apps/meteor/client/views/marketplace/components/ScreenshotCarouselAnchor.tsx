@@ -4,6 +4,7 @@ import { Box, Icon } from '@rocket.chat/fuselage';
 import type { ReactElement } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 
 import ScreenshotCarousel from './ScreenshotCarousel';
 
@@ -14,6 +15,8 @@ type ScreenshotCarouselAnchorProps = {
 type voidFunction = () => void;
 
 const ScreenshotCarouselAnchor = ({ screenshots }: ScreenshotCarouselAnchorProps): ReactElement => {
+	const { t } = useTranslation();
+
 	const [viewCarousel, setViewCarousel] = useState(false);
 
 	const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -25,7 +28,7 @@ const ScreenshotCarouselAnchor = ({ screenshots }: ScreenshotCarouselAnchorProps
 	const isFirstSlide = currentSlideIndex === 0;
 	const isLastSlide = currentSlideIndex === length - 1;
 
-	const isCarouselVisible = viewCarousel && screenshots?.length;
+	const isCarouselVisible = Boolean(viewCarousel && screenshots.length > 0);
 
 	const handleNextSlide = (): void => {
 		setCurrentSlideIndex(currentSlideIndex + 1);
@@ -43,12 +46,23 @@ const ScreenshotCarouselAnchor = ({ screenshots }: ScreenshotCarouselAnchorProps
 				Escape: () => setViewCarousel(false),
 			};
 
-			keysObject[onKeyDownEvent.key]();
+			const keyHandler = keysObject[onKeyDownEvent.key];
+
+			if (!keyHandler) {
+				return;
+			}
+
+			onKeyDownEvent.preventDefault();
+			keyHandler();
 		},
 		[length],
 	);
 
 	useEffect(() => {
+		if (length <= 1) {
+			return;
+		}
+
 		const intervalId = setInterval(() => {
 			setCurrentPreviewIndex((prevIndex) => {
 				if (prevIndex === length - 1) return 0;
@@ -57,13 +71,22 @@ const ScreenshotCarouselAnchor = ({ screenshots }: ScreenshotCarouselAnchorProps
 			});
 		}, 5000);
 
+		return (): void => {
+			clearInterval(intervalId);
+		};
+	}, [length]);
+
+	useEffect(() => {
+		if (!isCarouselVisible) {
+			return;
+		}
+
 		document.addEventListener('keydown', handleKeyboardKey);
 
 		return (): void => {
-			clearInterval(intervalId);
 			document.removeEventListener('keydown', handleKeyboardKey);
 		};
-	}, [handleKeyboardKey, length]);
+	}, [handleKeyboardKey, isCarouselVisible]);
 
 	const carouselPortal = createPortal(
 		<ScreenshotCarousel
@@ -81,6 +104,8 @@ const ScreenshotCarouselAnchor = ({ screenshots }: ScreenshotCarouselAnchorProps
 	return (
 		<>
 			<Box
+				is='button'
+				type='button'
 				onClick={(): void => setViewCarousel(true)}
 				display='flex'
 				flexDirection='column'
@@ -88,8 +113,12 @@ const ScreenshotCarouselAnchor = ({ screenshots }: ScreenshotCarouselAnchorProps
 				width='100%'
 				style={{
 					cursor: 'pointer',
+					border: 'none',
+					padding: 0,
+					background: 'transparent',
+					textAlign: 'left',
 				}}
-				tabIndex={0}
+				aria-label={t('Open_screenshot_carousel')}
 			>
 				<Box
 					is='img'
